@@ -1,0 +1,46 @@
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio files
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.rsuser
+
+# NuGet Packages
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+
+# Build output
+output/
+
+# Windows files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# IDE files
+*.swp
+*~
+.idea/
+*.code-workspace

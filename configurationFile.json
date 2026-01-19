@@ -1,0 +1,45 @@
+{
+	"system": {
+		"info": {}
+	},
+	"template": {
+		"devices": [
+			{
+				"key": "processor",
+				"type": "rmc4",
+				"name": "processor",
+				"group": "processor",
+				"supportedConfigModes": [],
+				"supportedSystemTypes": [],
+				"supportsCompliance": true,
+				"properties": {}
+			},
+			{
+				"key": "tcp-server-1",
+				"name": "TCP Server",
+				"type": "tcpserver",
+				"group": "api",
+				"properties": {
+					"addressToAcceptConnectionsFrom": "0.0.0.0",
+					"port": 5001,
+					"maxNuberOfClients": 2
+				}
+			},
+            {
+                "key": "devices-io-bridge",
+                "type": "eiscApiAdvanced",
+                "group": "api",
+                "properties": {
+                    "control": { "ipid": "a7", "method": "ipidTcp", "tcpSshProperties": { "address": "127.0.0.2", "port": 0 } },
+					"devices": [
+						{ "deviceKey": "tcp-server-1", "joinStart": 171 }
+					]
+				}
+            }     
+		],
+		"info": {},
+		"rooms": [],
+		"tieLines": [],
+		"joinMaps": {}
+	}
+}
