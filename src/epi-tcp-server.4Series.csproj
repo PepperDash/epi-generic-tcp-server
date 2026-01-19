@@ -28,7 +28,7 @@
     <None Remove="Properties\**" />
   </ItemGroup>
   <ItemGroup>
-    <None Remove="epi-make-model.projectinfo" />
+    <None Remove="epi-generic-tcp-server.projectinfo" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="PepperDashEssentials" Version="2.24.4">
@@ -36,9 +36,9 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <None Remove="../output\epi-make-model.4Series.1.0.0-local.cplz" />
+    <None Remove="../output\epi-generic-tcp-server.4Series.1.0.0-local.cplz" />
   </ItemGroup>
   <ItemGroup>
-    <None Remove="../output\epi-make-model.4Series.1.0.0-local.cplz" />
+    <None Remove="../output\epi-generic-tcp-server.4Series.1.0.0-local.cplz" />
   </ItemGroup>
 </Project>
