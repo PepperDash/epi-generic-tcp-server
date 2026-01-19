@@ -4,20 +4,20 @@
   </PropertyGroup>
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
-    <RootNamespace>PepperDash.Essentials.Plugin</RootNamespace>
+    <RootNamespace>PepperDash.Essentials.Plugins</RootNamespace>
     <Deterministic>false</Deterministic>
-    <AssemblyTitle>PepperDash.Essentials.Plugin.Make.Model</AssemblyTitle>
+    <AssemblyTitle>PepperDash.Essentials.Plugins.Generic.Tcp.Server</AssemblyTitle>
     <Company>PepperDash Technology</Company>
-    <Description>This software is a template for a PepperDash Essentials Plugin.</Description>
-    <Copyright>Copyright 2025</Copyright>
+    <Description>This software is a generic TCP server plugin for PepperDash Essentials.</Description>
+    <Copyright>Copyright 2026</Copyright>
     <Version>1.0.0-local</Version>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <InformationalVersion>$(Version)</InformationalVersion>
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <Authors>PepperDash Technology</Authors>
-    <PackageId>Pepperdash.Essentials.Plugins.Template</PackageId>
-    <PackageProjectUrl>https://github.com/PepperDash/EssentialsPluginTemplate.git</PackageProjectUrl>
-    <PackageTags>crestron 4series essentials plugin template</PackageTags>
+    <PackageId>Pepperdash.Essentials.Plugins.Generic.Tcp.Server</PackageId>
+    <PackageProjectUrl>https://github.com/PepperDash/epi-generic-tcp-server.git</PackageProjectUrl>
+    <PackageTags>crestron 4series essentials plugin generic tcp server</PackageTags>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DefineConstants>$(DefineConstants);SERIES4</DefineConstants>
