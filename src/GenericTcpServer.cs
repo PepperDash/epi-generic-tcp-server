@@ -302,7 +302,8 @@ namespace PepperDash.Essentials.Plugins
             // IsListening = false;
             IsListening = _server.Server.IsBound;
             
-            RemovePortForward();
+            // commented out to prevent port forward removal on stop
+            //RemovePortForward();
 
             this.LogInformation("StopServer: TCP Server {status}", IsListening ? "is listening" : "has been stopped");
         }
