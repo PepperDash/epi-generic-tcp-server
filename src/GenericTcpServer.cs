@@ -337,7 +337,7 @@ namespace PepperDash.Essentials.Plugins
         {
             try
             {
-                this.LogInformation("AddPortForward: Automatically forwarding port {externalPort} to CS LAN", _externalPort);
+                this.LogInformation("AddPortForward: Automatically forwarding port {externalPort} to CSLAN", _externalPort);
                 var csAdapterId = CrestronEthernetHelper.GetAdapterdIdForSpecifiedAdapterType(EthernetAdapterType.EthernetCSAdapter);
                 var csIp = CrestronEthernetHelper.GetEthernetParameter(CrestronEthernetHelper.ETHERNET_PARAMETER_TO_GET.GET_CURRENT_IP_ADDRESS, csAdapterId);
 
@@ -345,12 +345,16 @@ namespace PepperDash.Essentials.Plugins
 
                 if (result != CrestronEthernetHelper.PortForwardingUserPatRetCodes.NoErr)
                 {
-                    this.LogError("AddPortForward: Error adding port forwarding: {error}", result);
+                    this.LogError("AddPortForward: Error adding port forwarding: {error}`n`tNOTE: If port forward already exists, this is expected, showportmap to verify.", result);
+                }
+                else
+                {
+                    this.LogInformation("AddPortForward: Successfully forwarded port {externalPort} to CSLAN", _externalPort);
                 }
             }
             catch (ArgumentException)
             {
-                this.LogInformation("AddPortForward: This processor does not have a CS LAN", this);
+                this.LogInformation("AddPortForward: This processor does not have a CSLAN", this);
             }
             catch (Exception ex)
             {
@@ -362,7 +366,7 @@ namespace PepperDash.Essentials.Plugins
         {
             try
             {
-                this.LogInformation("RemovePortForward: Automatically removing port forwarding for port {externalPort} from CS LAN", _externalPort);
+                this.LogInformation("RemovePortForward: Automatically removing port forwarding for port {externalPort} from CSLAN", _externalPort);
                 var csAdapterId = CrestronEthernetHelper.GetAdapterdIdForSpecifiedAdapterType(EthernetAdapterType.EthernetCSAdapter);
                 var csIp = CrestronEthernetHelper.GetEthernetParameter(CrestronEthernetHelper.ETHERNET_PARAMETER_TO_GET.GET_CURRENT_IP_ADDRESS, csAdapterId);
 
@@ -370,7 +374,11 @@ namespace PepperDash.Essentials.Plugins
 
                 if (result != CrestronEthernetHelper.PortForwardingUserPatRetCodes.NoErr)
                 {
-                    this.LogError("RemovePortForward: Error removing port forwarding: {error}", result);
+                    this.LogError("RemovePortForward: Error removing port forwarding: {error}`n`tNOTE: If port forward does not exist, this is expected, showportmap to verify.", result);
+                }
+                else
+                {
+                    this.LogInformation("RemovePortForward: Successfully removed port forwarding for port {externalPort} from CSLAN", _externalPort);
                 }
             }
             catch (ArgumentException)
