@@ -12,6 +12,8 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using IPEndPoint = System.Net.IPEndPoint;
+using IPAddress =  System.Net.IPAddress;
+using PepperDash.Core.Logging;
 
 namespace PepperDash.Essentials.Plugins
 {
@@ -22,6 +24,10 @@ namespace PepperDash.Essentials.Plugins
         private readonly TcpListener _server;
         private readonly List<TcpClient> _clients;
         private Thread _listenerThread;
+
+        private int _internalPort;
+        private int _externalPort;
+
 
         private EiscApiAdvanced eisc;
         private GenericTcpServerBridgeJoinMap joinMap;
@@ -53,14 +59,15 @@ namespace PepperDash.Essentials.Plugins
             : base(key, name)
         {
             _config = config;
+            _internalPort = config.Port > 5000 ? config.Port : 5001;
+            _externalPort = _internalPort;
 
             try
             {
                 _endPoint = new IPEndPoint(
                 string.IsNullOrEmpty(_config.AddressToAcceptConnectionsFrom)
                     ? System.Net.IPAddress.Any
-                    : System.Net.IPAddress.Parse(_config.AddressToAcceptConnectionsFrom),
-                _config.Port > 5000 ? _config.Port : 5001);
+                    : System.Net.IPAddress.Parse(_config.AddressToAcceptConnectionsFrom), _internalPort);
 
                 _server = new TcpListener(_endPoint);
 
@@ -69,7 +76,7 @@ namespace PepperDash.Essentials.Plugins
             }
             catch (Exception ex)
             {
-                Debug.LogError($"GenericTcpServer Constructor Exception: {ex}");
+                this.LogError(ex, "Exception in GenericTcpServer Constructor");
                 return;
             }
 
@@ -89,6 +96,8 @@ namespace PepperDash.Essentials.Plugins
                 // Start the listener thread AFTER the server has started
                 _listenerThread = new Thread(new ThreadStart(HandleClientConnections));
                 _listenerThread.Start();
+
+                AddPortForward();
             }
             base.Initialize();
         }
@@ -115,15 +124,15 @@ namespace PepperDash.Essentials.Plugins
 
             eisc = bridge;
 
-            Debug.LogInformation("LinkToApi: Linking to Trilist '{0}'", trilist.ID.ToString("X"));
-            Debug.LogInformation("LinkToApi: Linking to Bridge Type {0}", GetType().Name);
+            this.LogInformation("LinkToApi: Linking to Trilist '{trilistId}'", trilist.ID.ToString("X"));
+            this.LogInformation("LinkToApi: Linking to Bridge Type {bridgeType}", GetType().Name);
 
             // links to bridge
             trilist.SetString(joinMap.DeviceName.JoinNumber, Name);
 
             trilist.SetBoolSigAction(joinMap.IsListening.JoinNumber, b =>
             {
-                Debug.LogInformation($"LinkToApi: IsListening set to {b}");
+                this.LogInformation("LinkToApi: IsListening set to {status}", b ? "TRUE" : "FALSE");
                 if (b)
                     StartServer();
                 else
@@ -136,9 +145,8 @@ namespace PepperDash.Essentials.Plugins
 
             trilist.SetStringSigAction(joinMap.DataSend.JoinNumber, text =>
             {
-                Debug.LogInformation($"LinkToApi: '{text}' ==> SendTextTextToAllClients");
+                this.LogInformation("LinkToApi: '{text}' ==> SendTextTextToAllClients", text);
                 SendTextToAllClients(text);
-                //SendBytesToAllClients(Encoding.ASCII.GetBytes(text));
             });
 
             trilist.OnlineStatusChange += (o, a) =>
@@ -165,17 +173,17 @@ namespace PepperDash.Essentials.Plugins
         {
             if (eisc == null)
             {
-                Debug.LogError("SendTextToBridge: EISC is null, cannot send text");
+                this.LogError("SendTextToBridge: EISC is null, cannot send text");
                 return;
             }
 
             if (text == null)
             {
-                Debug.LogWarning("SendTextToBridge: text is null");
+                this.LogWarning("SendTextToBridge: text is null");
                 return;
             }
 
-            Debug.LogWarning($"SendTextToBridge: '{text}'");
+            this.LogWarning("SendTextToBridge: '{text}'", text);
             eisc.Eisc.SetString(joinMap.DataSend.JoinNumber, text);
         }
 
@@ -187,18 +195,20 @@ namespace PepperDash.Essentials.Plugins
         {
             if (eisc == null)
             {
-                Debug.LogError("SendBytesToBridge: EISC is null, cannot send bytes");
+                this.LogError("SendBytesToBridge: EISC is null, cannot send bytes");
                 return;
             }
 
             if (bytes == null || bytes.Length == 0)
             {
-                Debug.LogWarning("SendBytesToBridge: bytes is null or empty");
+                this.LogWarning("SendBytesToBridge: bytes is null or empty");
                 return;
             }
 
-            Debug.LogWarning($"SendBytesToBridge: '{Encoding.ASCII.GetString(bytes, 0, bytes.Length)}'");
-            eisc.Eisc.SetString(joinMap.DataSend.JoinNumber, Encoding.ASCII.GetString(bytes, 0, bytes.Length));
+            var byteString = Encoding.ASCII.GetString(bytes, 0, bytes.Length);
+
+            this.LogWarning("SendBytesToBridge: '{bytesString}'", byteString);
+            eisc.Eisc.SetString(joinMap.DataSend.JoinNumber, byteString);
         }
 
         /// <summary>
@@ -220,7 +230,7 @@ namespace PepperDash.Essentials.Plugins
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"SendTextToAllClients Exception: {ex}");
+                        this.LogError(ex, "SendTextToAllClients Exception");
                     }
                 }
             }
@@ -244,7 +254,7 @@ namespace PepperDash.Essentials.Plugins
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"SendBytesToAllClients Exception: {ex}");
+                        this.LogError(ex, "SendBytesToAllClients Exception");
                     }
                 }
             }
@@ -257,12 +267,14 @@ namespace PepperDash.Essentials.Plugins
         {
             if (IsListening)
             {
-                Debug.LogInformation($"StartServer: TCP Server {(IsListening ? "is listening" : "is stopped")}");
+                this.LogInformation("StartServer: TCP Server {status}", IsListening ? "is listening" : "is stopped");
                 return;
             }
 
             _server.Start(_config.MaxNumberOfClients);
-            IsListening = true;
+
+            // IsListening = true;
+            IsListening = _server.Server.IsBound;
 
             if (_listenerThread == null || !_listenerThread.IsAlive)
             {
@@ -270,7 +282,7 @@ namespace PepperDash.Essentials.Plugins
                 _listenerThread.Start();
             }
 
-            Debug.LogInformation($"StartServer: TCP Server {(IsListening ? "has been started" : "is stopped")}");
+            this.LogInformation("StartServer: TCP Server {status}", IsListening ? "has been started" : "is stopped");
         }
 
         /// <summary>
@@ -280,16 +292,19 @@ namespace PepperDash.Essentials.Plugins
         {
             if (!IsListening)
             {
-                Debug.LogInformation($"StopServer: TCP Server {(IsListening ? "is listening" : "is stopped")}");
+                this.LogInformation("StopServer: TCP Server {status}", IsListening ? "is listening" : "is stopped");
                 return;
             }
 
             DisconnectAllClients();
 
-            IsListening = false;
             _server.Stop();
+            // IsListening = false;
+            IsListening = _server.Server.IsBound;
+            
+            RemovePortForward();
 
-            Debug.LogInformation($"StopServer: TCP Server {(IsListening ? "is listening" : "has been stopped")}");
+            this.LogInformation("StopServer: TCP Server {status}", IsListening ? "is listening" : "has been stopped");
         }
 
         /// <summary>
@@ -307,7 +322,7 @@ namespace PepperDash.Essentials.Plugins
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"DisconnectAllClients Exception: {ex}");
+                        this.LogError(ex, "DisconnectAllClients Exception");
                     }
                 }
             }
@@ -315,7 +330,57 @@ namespace PepperDash.Essentials.Plugins
 
             ClientsConnectedFeedback.FireUpdate();
 
-            Debug.LogInformation("All clients disconnected");
+            this.LogInformation("All clients disconnected");
+        }
+
+        private void AddPortForward()
+        {
+            try
+            {
+                this.LogInformation("AddPortForward: Automatically forwarding port {externalPort} to CS LAN", _externalPort);
+                var csAdapterId = CrestronEthernetHelper.GetAdapterdIdForSpecifiedAdapterType(EthernetAdapterType.EthernetCSAdapter);
+                var csIp = CrestronEthernetHelper.GetEthernetParameter(CrestronEthernetHelper.ETHERNET_PARAMETER_TO_GET.GET_CURRENT_IP_ADDRESS, csAdapterId);
+
+                var result = CrestronEthernetHelper.AddPortForwarding((ushort)_externalPort, (ushort)_internalPort, csIp, CrestronEthernetHelper.ePortMapTransport.TCP);
+
+                if (result != CrestronEthernetHelper.PortForwardingUserPatRetCodes.NoErr)
+                {
+                    this.LogError("AddPortForward: Error adding port forwarding: {error}", result);
+                }
+            }
+            catch (ArgumentException)
+            {
+                this.LogInformation("AddPortForward: This processor does not have a CS LAN", this);
+            }
+            catch (Exception ex)
+            {
+                this.LogError(ex, "AddPortForward: Error automatically forwarding port to CSLAN");
+            }
+        }
+
+        private void RemovePortForward()
+        {
+            try
+            {
+                this.LogInformation("RemovePortForward: Automatically removing port forwarding for port {externalPort} from CS LAN", _externalPort);
+                var csAdapterId = CrestronEthernetHelper.GetAdapterdIdForSpecifiedAdapterType(EthernetAdapterType.EthernetCSAdapter);
+                var csIp = CrestronEthernetHelper.GetEthernetParameter(CrestronEthernetHelper.ETHERNET_PARAMETER_TO_GET.GET_CURRENT_IP_ADDRESS, csAdapterId);
+
+                var result = CrestronEthernetHelper.RemovePortForwarding((ushort)_externalPort, (ushort)_internalPort, csIp, CrestronEthernetHelper.ePortMapTransport.TCP);
+
+                if (result != CrestronEthernetHelper.PortForwardingUserPatRetCodes.NoErr)
+                {
+                    this.LogError("RemovePortForward: Error removing port forwarding: {error}", result);
+                }
+            }
+            catch (ArgumentException)
+            {
+                this.LogInformation("RemovePortForward: This processor does not have a CS LAN", this);
+            }
+            catch (Exception ex)
+            {
+                this.LogError(ex, "RemovePortForward: Error automatically removing port forwarding from CSLAN");
+            }
         }
 
         void HandleProgramEvent(eProgramStatusEventType status)
@@ -328,7 +393,7 @@ namespace PepperDash.Essentials.Plugins
 
         void HandleClientConnections()
         {
-            Debug.LogInformation($"HandleClientConnections: TCP Server STARTED listening on {_endPoint.Address}:{_endPoint.Port}");
+            this.LogInformation("HandleClientConnections: TCP Server STARTED listening on {endPointAddress}:{endPointPort}", _endPoint.Address, _endPoint.Port);
 
             while (IsListening)
             {
@@ -338,7 +403,7 @@ namespace PepperDash.Essentials.Plugins
                     {
                         var client = _server.AcceptTcpClient();
                         _clients.Add(client);
-                        Debug.LogInformation($"HandleClientConnections: Client connected from {client.Client.RemoteEndPoint}");
+                        this.LogInformation("HandleClientConnections: Client connected from {remoteEndPoint}", client.Client.RemoteEndPoint);
 
                         ClientsConnectedFeedback.FireUpdate();
 
@@ -352,11 +417,11 @@ namespace PepperDash.Essentials.Plugins
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError($"HandleClientConnections Exception: {ex}");
+                    this.LogError(ex, "HandleClientConnections Exception");
                 }
             }
 
-            Debug.LogInformation($"HandleClientConnections: TCP Server STOPPED listening on {_endPoint.Address}:{_endPoint.Port}");
+            this.LogInformation("HandleClientConnections: TCP Server STOPPED listening on {endPointAddress}:{endPointPort}", _endPoint.Address, _endPoint.Port);
         }
 
         void HandleClientSession(object obj)
@@ -377,7 +442,7 @@ namespace PepperDash.Essentials.Plugins
                             if (length > 0)
                             {
                                 var message = Encoding.ASCII.GetString(buffer, 0, length).Trim();
-                                Debug.LogVerbose($"HandleClientSession: Received message from {client.Client.RemoteEndPoint}: {message}");
+                                this.LogVerbose("HandleClientSession: Received message from {remoteEndPoint}: {message}", client.Client.RemoteEndPoint, message);
 
                                 SendTextToBridge(message);
 
@@ -393,7 +458,7 @@ namespace PepperDash.Essentials.Plugins
             }
             catch (Exception ex)
             {
-                Debug.LogError($"HandleClientSession Exception: {ex}");
+                this.LogError(ex, "HandleClientSession Exception");
             }
         }
 
@@ -409,7 +474,7 @@ namespace PepperDash.Essentials.Plugins
                     _server.Server.Dispose();
                 }
                 
-                Debug.LogInformation("GenericTcpServer disposed");
+                this.LogInformation("GenericTcpServer disposed");
             }
         }
     }
