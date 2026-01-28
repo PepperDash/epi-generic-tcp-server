@@ -15,7 +15,7 @@ using IPEndPoint = System.Net.IPEndPoint;
 
 namespace PepperDash.Essentials.Plugins
 {
-    public class GenericTcpServer : EssentialsBridgeableDevice
+    public class GenericTcpServer : EssentialsBridgeableDevice, IDisposable
     {
         private readonly GenericTcpServerConfig _config;
         private readonly IPEndPoint _endPoint;
@@ -70,7 +70,10 @@ namespace PepperDash.Essentials.Plugins
             catch (Exception ex)
             {
                 Debug.LogError($"GenericTcpServer Constructor Exception: {ex}");
+                return;
             }
+
+            CrestronEnvironment.ProgramStatusEventHandler += HandleProgramEvent;
         }
 
         /// <summary>
@@ -281,8 +284,9 @@ namespace PepperDash.Essentials.Plugins
                 return;
             }
 
-            IsListening = false;
             DisconnectAllClients();
+
+            IsListening = false;
             _server.Stop();
 
             Debug.LogInformation($"StopServer: TCP Server {(IsListening ? "is listening" : "has been stopped")}");
@@ -318,11 +322,7 @@ namespace PepperDash.Essentials.Plugins
         {
             if (status == eProgramStatusEventType.Stopping)
             {
-                IsListening = false;
-
-                DisconnectAllClients();
-
-                _server.Stop();
+                Dispose();
             }
         }
 
@@ -330,7 +330,7 @@ namespace PepperDash.Essentials.Plugins
         {
             Debug.LogInformation($"HandleClientConnections: TCP Server STARTED listening on {_endPoint.Address}:{_endPoint.Port}");
 
-            while (_isListening)
+            while (IsListening)
             {
                 try
                 {
@@ -394,6 +394,22 @@ namespace PepperDash.Essentials.Plugins
             catch (Exception ex)
             {
                 Debug.LogError($"HandleClientSession Exception: {ex}");
+            }
+        }
+
+        public void Dispose()
+        {
+            if(_server != null)
+            {
+                StopServer();
+
+                if (_server.Server != null)
+                {
+                    _server.Server.Close();
+                    _server.Server.Dispose();
+                }
+                
+                Debug.LogInformation("GenericTcpServer disposed");
             }
         }
     }
