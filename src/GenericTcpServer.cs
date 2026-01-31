@@ -442,28 +442,45 @@ namespace PepperDash.Essentials.Plugins
                 {
                     var buffer = new byte[1024];
 
-                    while (client.Connected)
+                    while (IsListening && client.Connected)
                     {
-                        if (stream.DataAvailable)
+                        try
                         {
-                            var length = stream.Read(buffer, 0, buffer.Length);
-
-                            if (length > 0)
+                            if (stream.DataAvailable)
                             {
-                                var message = Encoding.ASCII.GetString(buffer, 0, length).Trim();
-                                this.LogVerbose("HandleClientSession: Received message from {remoteEndPoint}: {message}", client.Client.RemoteEndPoint, message);
+                                var length = stream.Read(buffer, 0, buffer.Length);
 
-                                SendTextToBridge(message);
+                                if (length > 0)
+                                {
+                                    var message = Encoding.ASCII.GetString(buffer, 0, length).Trim();
+                                    this.LogVerbose("HandleClientSession: Received message from {remoteEndPoint}: {message}", client.Client.RemoteEndPoint, message);
 
-                                // Echo the message back to the client
-                                //var response = Encoding.ASCII.GetBytes($"Echo: {message}");
-                                //stream.Write(response, 0, response.Length);
+                                    SendTextToBridge(message);
+
+                                    // Echo the message back to the client
+                                    //var response = Encoding.ASCII.GetBytes($"Echo: {message}");
+                                    //stream.Write(response, 0, response.Length);
+                                }
                             }
+                            else
+                            {
+                                Thread.Sleep(10); // Small sleep when no data available
+                            }
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            // Stream was disposed during shutdown, exit gracefully
+                            break;
                         }
                     }
 
                     ClientsConnectedFeedback.FireUpdate();
                 }
+            }
+            catch (ObjectDisposedException)
+            {
+                // Expected during shutdown, no need to log as error
+                this.LogDebug("HandleClientSession: Stream disposed during shutdown");
             }
             catch (Exception ex)
             {
