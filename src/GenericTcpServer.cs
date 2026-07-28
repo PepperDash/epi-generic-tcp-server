@@ -23,6 +23,7 @@ namespace PepperDash.Essentials.Plugins
 		private readonly IPEndPoint _endPoint;
 		private readonly TcpListener _server;
 		private readonly List<TcpClient> _clients;
+		private readonly object _clientsLock = new object();
 		private Thread _listenerThread;
 
 		private int _internalPort;
@@ -74,7 +75,7 @@ namespace PepperDash.Essentials.Plugins
 
 				// Initialize feedback instances once (not on every property access)
 				IsListeningFeedback = new BoolFeedback("IsListeningFeedback", () => IsListening);
-				ClientsConnectedFeedback = new IntFeedback("ClientsConnectedFeedback", () => _clients.Count);
+				ClientsConnectedFeedback = new IntFeedback("ClientsConnectedFeedback", () => { lock (_clientsLock) { return _clients.Count; } });
 			}
 			catch (Exception ex)
 			{
@@ -216,7 +217,12 @@ namespace PepperDash.Essentials.Plugins
 		{
 			if (string.IsNullOrEmpty(text)) return;
 			var message = Encoding.ASCII.GetBytes(text);
-			foreach (var client in _clients)
+			TcpClient[] clientsSnapshot;
+			lock (_clientsLock)
+			{
+				clientsSnapshot = _clients.ToArray();
+			}
+			foreach (var client in clientsSnapshot)
 			{
 				if (client.Connected)
 				{
@@ -240,7 +246,12 @@ namespace PepperDash.Essentials.Plugins
 		public void SendBytesToAllClients(byte[] bytes)
 		{
 			if (bytes == null || bytes.Length == 0) return;
-			foreach (var client in _clients)
+			TcpClient[] clientsSnapshot;
+			lock (_clientsLock)
+			{
+				clientsSnapshot = _clients.ToArray();
+			}
+			foreach (var client in clientsSnapshot)
 			{
 				if (client.Connected)
 				{
@@ -310,7 +321,13 @@ namespace PepperDash.Essentials.Plugins
 		/// </summary>
 		public void DisconnectAllClients()
 		{
-			foreach (var client in _clients)
+			TcpClient[] clientsSnapshot;
+			lock (_clientsLock)
+			{
+				clientsSnapshot = _clients.ToArray();
+				_clients.Clear();
+			}
+			foreach (var client in clientsSnapshot)
 			{
 				if (client.Connected)
 				{
@@ -324,7 +341,6 @@ namespace PepperDash.Essentials.Plugins
 					}
 				}
 			}
-			_clients.Clear();
 
 			ClientsConnectedFeedback.FireUpdate();
 
@@ -408,7 +424,10 @@ namespace PepperDash.Essentials.Plugins
 					if (_server.Pending())
 					{
 						var client = _server.AcceptTcpClient();
-						_clients.Add(client);
+						lock (_clientsLock)
+						{
+							_clients.Add(client);
+						}
 						this.LogInformation("HandleClientConnections: Client connected from {remoteEndPoint}", client.Client.RemoteEndPoint);
 
 						ClientsConnectedFeedback.FireUpdate();
@@ -445,9 +464,9 @@ namespace PepperDash.Essentials.Plugins
 
 		void HandleClientSession(object obj)
 		{
+			var client = (TcpClient)obj;
 			try
 			{
-				var client = (TcpClient)obj;
 				using (var stream = client.GetStream())
 				{
 					var buffer = new byte[1024];
@@ -483,8 +502,6 @@ namespace PepperDash.Essentials.Plugins
 							break;
 						}
 					}
-
-					ClientsConnectedFeedback.FireUpdate();
 				}
 			}
 			catch (ObjectDisposedException)
@@ -495,6 +512,16 @@ namespace PepperDash.Essentials.Plugins
 			catch (Exception ex)
 			{
 				this.LogError(ex, "HandleClientSession Exception");
+			}
+			finally
+			{
+				// Remove client from list when session ends
+				lock (_clientsLock)
+				{
+					_clients.Remove(client);
+				}
+				ClientsConnectedFeedback.FireUpdate();
+				this.LogDebug("HandleClientSession: Client disconnected");
 			}
 		}
 
