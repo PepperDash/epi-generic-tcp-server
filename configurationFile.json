@@ -17,12 +17,12 @@
 			{
 				"key": "tcp-server-1",
 				"name": "TCP Server",
-				"type": "tcpserver",
+				"type": "tcpServer",
 				"group": "api",
 				"properties": {
 					"addressToAcceptConnectionsFrom": "0.0.0.0",
 					"port": 5001,
-					"maxNuberOfClients": 2
+					"maxNumberOfClients": 2
 				}
 			},
             {

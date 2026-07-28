@@ -15,7 +15,7 @@ This plugin provides a generic TCP server that listens for client connections an
   "properties": {
     "addressToAcceptConnectionsFrom": "0.0.0.0",
     "port": 5001,
-    "maxNuberOfClients": 2
+    "maxNumberOfClients": 2
   }
 }
 ```
@@ -29,7 +29,7 @@ This plugin provides a generic TCP server that listens for client connections an
   - Common choices: 5001, 9000, etc.
 
 - **maxNumberOfClients** (integer, optional): Max number of clients to listen for
-  - If ommitted, will default to 1
+  - If omitted, will default to 5
 
 ### Bridge Configuration
 

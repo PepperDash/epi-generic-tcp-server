@@ -44,10 +44,8 @@ namespace PepperDash.Essentials.Plugins
                 IsListeningFeedback.FireUpdate();
             }
         }
-        public BoolFeedback IsListeningFeedback => new BoolFeedback("IsListeningFeedback", () => IsListening);
-
-        
-        public IntFeedback ClientsConnectedFeedback => new IntFeedback("ClientsConnectedFeedback", () => _clients.Count);
+        public BoolFeedback IsListeningFeedback { get; private set; }
+        public IntFeedback ClientsConnectedFeedback { get; private set; }
 
         /// <summary>
         /// TCP Server Device Constructor
@@ -73,6 +71,10 @@ namespace PepperDash.Essentials.Plugins
 
                 // keep track of connected clients
                 _clients = new List<TcpClient>();
+
+                // Initialize feedback instances once (not on every property access)
+                IsListeningFeedback = new BoolFeedback("IsListeningFeedback", () => IsListening);
+                ClientsConnectedFeedback = new IntFeedback("ClientsConnectedFeedback", () => _clients.Count);
             }
             catch (Exception ex)
             {
@@ -160,11 +162,6 @@ namespace PepperDash.Essentials.Plugins
             };
         }
 
-        private void ComPortController_TextReceived(object sender, GenericCommMethodReceiveTextArgs e)
-        {
-            throw new NotImplementedException();
-        }
-
         /// <summary>
         /// Send text string to SIMPL bridge
         /// </summary>
@@ -184,7 +181,7 @@ namespace PepperDash.Essentials.Plugins
             }
 
             this.LogWarning("SendTextToBridge: '{text}'", text);
-            eisc.Eisc.SetString(joinMap.DataSend.JoinNumber, text);
+            eisc.Eisc.SetString(joinMap.DataReceived.JoinNumber, text);
         }
 
         /// <summary>
@@ -208,7 +205,7 @@ namespace PepperDash.Essentials.Plugins
             var byteString = Encoding.ASCII.GetString(bytes, 0, bytes.Length);
 
             this.LogWarning("SendBytesToBridge: '{bytesString}'", byteString);
-            eisc.Eisc.SetString(joinMap.DataSend.JoinNumber, byteString);
+            eisc.Eisc.SetString(joinMap.DataReceived.JoinNumber, byteString);
         }
 
         /// <summary>
@@ -346,7 +343,7 @@ namespace PepperDash.Essentials.Plugins
 
                 if (result != CrestronEthernetHelper.PortForwardingUserPatRetCodes.NoErr)
                 {
-                    this.LogError("AddPortForward: Error adding port forwarding: {error}`n`tNOTE: If port forward already exists, this is expected, showportmap to verify.", result);
+                    this.LogError("AddPortForward: Error adding port forwarding: {error}\n\tNOTE: If port forward already exists, this is expected, showportmap to verify.", result);
                 }
                 else
                 {
@@ -375,7 +372,7 @@ namespace PepperDash.Essentials.Plugins
 
                 if (result != CrestronEthernetHelper.PortForwardingUserPatRetCodes.NoErr)
                 {
-                    this.LogError("RemovePortForward: Error removing port forwarding: {error}`n`tNOTE: If port forward does not exist, this is expected, showportmap to verify.", result);
+                    this.LogError("RemovePortForward: Error removing port forwarding: {error}\n\tNOTE: If port forward does not exist, this is expected, showportmap to verify.", result);
                 }
                 else
                 {

@@ -15,8 +15,7 @@ namespace PepperDash.Essentials.Plugins
 		public GenericTcpServerFactory()
 		{
 			// Set the minimum Essentials Framework Version
-			// TODO [ ] Update the Essentials minimum framework version which this plugin has been tested against
-			MinimumEssentialsFrameworkVersion = "2.20.5";
+			MinimumEssentialsFrameworkVersion = "2.24.4";
 
 			// In the constructor we initialize the list with the typenames that will build an instance of this device
 			// TODO [ ] Update the TypeNames for the plugin being developed
