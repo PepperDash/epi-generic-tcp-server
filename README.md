@@ -1,48 +1,81 @@
-![PepperDash Essentials Pluign Logo](/images/essentials-plugin-blue.png)
-
-# Essentials Plugin Template (c) 2025
-
-## License
-
-Provided under MIT license
+# TCP Server Usage Guide
 
 ## Overview
+This plugin provides a generic TCP server that listens for client connections and passes received data back to the `TcpServer` class. The server supports multiple simultaneous client connections and allows for configuration of the listening IP address and port.
 
-Fork this repo when creating a new plugin for Essentials. For more information about plugins, refer to the Essentials Wiki [Plugins](https://pepperdash.github.io/Essentials/docs/Plugins.html) article.
+## Configuration
 
-This repo contains example classes for the three main categories of devices:
-* `MakeModelDevice`: Used for most third party devices which require communication over a streaming mechanism such as a Com port, TCP/SSh/UDP socket, CEC, etc
-* `MakeModelLogicDevice`:  Used for devices that contain logic, but don't require any communication with third parties outside the program
-* `MakeModelCrestronDevice`:  Used for devices that represent a piece of Crestron hardware
+### Device Configuration
 
-There are matching factory classes for each of the three categories of devices.  The `MakeModelConfigObject` should be used as a template and modified for any of the categories of device.  Same goes for the `MakeModeleBridgeJoinMap`.
+```json
+{
+  "key": "tcp-server-1",
+  "name": "TCP Server",
+  "type": "tcpServer",
+  "properties": {
+    "addressToAcceptConnectionsFrom": "0.0.0.0",
+    "port": 5001,
+    "maxNuberOfClients": 2
+  }
+}
+```
 
-This also illustrates how a plugin can contain multiple devices.
+- **addressToAcceptConnectionsFrom** (string, required): The IP address to listen on
+  - Use `"0.0.0.0"` to listen for any connection
+  - Use a specific IP address like `"192.168.1.100"` to listen for a particular connection
 
-## Cloning Instructions
+- **port** (integer, required): The port number to listen on
+  - Must be between 1 and 65535
+  - Common choices: 5001, 9000, etc.
 
-After forking this repository into your own GitHub space, you can create a new repository using this one as the template.  Then you must install the necessary dependencies as indicated below.
+- **maxNumberOfClients** (integer, optional): Max number of clients to listen for
+  - If ommitted, will default to 1
 
-## Dependencies
+### Bridge Configuration
 
-The [Essentials](https://github.com/PepperDash/Essentials) libraries are required. They referenced via nuget. You must have nuget.exe installed and in the `PATH` environment variable to use the following command. Nuget.exe is available at [nuget.org](https://dist.nuget.org/win-x86-commandline/latest/nuget.exe).
+```json
+{
+  "key": "devices-io-bridge",
+  "type": "eiscApiAdvanced",
+  "group": "api",
+  "properties": {
+    "control": { 
+      "ipid": "a7", 
+      "method": "ipidTcp", 
+      "tcpSshProperties": { 
+        "address": "127.0.0.2", 
+        "port": 0 
+      } 
+    },
+    "devices": [
+      { 
+        "deviceKey": "tcp-server-1", 
+        "joinStart": 171 
+      }
+    ]
+  }
+}
+```
 
-### Installing Dependencies
+### Bridge Join Map
 
-Dependencies will be automatically installed when
+#### Digital Joins
 
-### Instructions for Renaming Solution and Files
+| Join | Name                 | I/O           | Description                                                        |
+| ---- | -------------------- | ------------- | ------------------------------------------------------------------ |
+| 1    | IsListening          | To/From SIMPL | Starts/stops the TCP server listening and reports listening status |
+| 2    | DisconnectAllClients | From SIMPL    | Disconnects all connected clients                                  |
 
-See the Task List in Visual Studio for a guide on how to start using the template.  There is extensive inline documentation and examples as well.
+#### Analog Joins
 
-For renaming instructions in particular, see the XML `remarks` tags on class definitions
+| Join | Name             | I/O      | Description                           |
+| ---- | ---------------- | -------- | ------------------------------------- |
+| 2    | ClientsConnected | To SIMPL | Number of clients currently connected |
 
-## Build Instructions (PepperDash Internal) 
+#### Serial Joins
 
-## Generating Nuget Package
-
-A nuget package is automatically generated when the plugin is build. To modify the name and other details of the package, edit the following properties in the .csproj file:
-
-1. `PackageId` - This is the name that will be used to pull the package from Nuget once it's published
-2. `PackgeProjectUrl` - This should match the URL for the plugin repo
-3. `AssemblyTitle` - This is the dll file name that is will show on a processor when the plugin is loaded
+| Join | Name         | I/O        | Description               |
+| ---- | ------------ | ---------- | ------------------------- |
+| 1    | DataReceived | To SIMPL   | Data received from client |
+| 1    | DataSend     | From SIMPL | Data sent to client       |
+| 2    | DeviceName   | To SIMPL   | Device Name               |
