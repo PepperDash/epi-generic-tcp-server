@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProjectType>ProgramLibrary</ProjectType>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <RootNamespace>PepperDash.Essentials.Plugins</RootNamespace>
+    <Deterministic>false</Deterministic>
+    <AssemblyTitle>PepperDash.Essentials.Plugins.Generic.Tcp.Server</AssemblyTitle>
+    <Company>PepperDash Technology</Company>
+    <Description>This software is a generic TCP server plugin for PepperDash Essentials.</Description>
+    <Copyright>Copyright 2026</Copyright>
+    <Version>1.0.0-local</Version>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <Authors>PepperDash Technology</Authors>
+    <PackageId>Pepperdash.Essentials.Plugins.Generic.Tcp.Server</PackageId>
+    <PackageProjectUrl>https://github.com/PepperDash/epi-generic-tcp-server.git</PackageProjectUrl>
+    <PackageTags>crestron 4series essentials plugin generic tcp server</PackageTags>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>$(DefineConstants);SERIES4</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="Properties\**" />
+    <EmbeddedResource Remove="Properties\**" />
+    <None Remove="Properties\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="epi-generic-tcp-server.projectinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="PepperDashEssentials" Version="2.24.4">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="../output\epi-generic-tcp-server.4Series.1.0.0-local.cplz" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="../output\epi-generic-tcp-server.4Series.1.0.0-local.cplz" />
+  </ItemGroup>
+</Project>
