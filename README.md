@@ -79,3 +79,92 @@ This plugin provides a generic TCP server that listens for client connections an
 | 1    | DataReceived | To SIMPL   | Data received from client |
 | 1    | DataSend     | From SIMPL | Data sent to client       |
 | 2    | DeviceName   | To SIMPL   | Device Name               |
+<!-- START Minimum Essentials Framework Versions -->
+### Minimum Essentials Framework Versions
+
+- 2.24.4
+<!-- END Minimum Essentials Framework Versions -->
+<!-- START Config Example -->
+### Config Example
+
+```json
+{
+    "key": "GeneratedKey",
+    "uid": 1,
+    "name": "GeneratedName",
+    "type": "tcpServer",
+    "group": "Group",
+    "properties": {
+        "control": "SampleValue",
+        "AddressToAcceptConnectionsFrom": "SampleString",
+        "Port": 0,
+        "MaxNumberOfClients": 0
+    }
+}
+```
+<!-- END Config Example -->
+<!-- START Supported Types -->
+### Supported Types
+
+- tcpServer
+<!-- END Supported Types -->
+<!-- START Join Maps -->
+### Join Maps
+
+#### Digitals
+
+| Join | Type (RW) | Description |
+| --- | --- | --- |
+| 1 | R | Starts/stops the TCP server listening and reports listening status |
+| 2 | R | Disconnects all connected clients |
+
+#### Analogs
+
+| Join | Type (RW) | Description |
+| --- | --- | --- |
+| 2 | R | Clients Connected |
+
+#### Serials
+
+| Join | Type (RW) | Description |
+| --- | --- | --- |
+| 1 | R | Data received from client |
+| 1 | R | Data sent to client |
+| 2 | R | Device Name |
+<!-- END Join Maps -->
+<!-- START Interfaces Implemented -->
+### Interfaces Implemented
+
+- IDisposable
+<!-- END Interfaces Implemented -->
+<!-- START Base Classes -->
+### Base Classes
+
+- JoinMapBaseAdvanced
+- EssentialsBridgeableDevice
+<!-- END Base Classes -->
+<!-- START Public Methods -->
+### Public Methods
+
+- public void SendTextToBridge(string text)
+- public void SendBytesToBridge(byte[] bytes)
+- public void SendTextToAllClients(string text)
+- public void SendBytesToAllClients(byte[] bytes)
+- public void StartServer()
+- public void StopServer()
+- public void DisconnectAllClients()
+- public void Dispose()
+<!-- END Public Methods -->
+<!-- START Bool Feedbacks -->
+### Bool Feedbacks
+
+- IsListeningFeedback
+<!-- END Bool Feedbacks -->
+<!-- START Int Feedbacks -->
+### Int Feedbacks
+
+- ClientsConnectedFeedback
+<!-- END Int Feedbacks -->
+<!-- START String Feedbacks -->
+
+<!-- END String Feedbacks -->
