@@ -148,7 +148,7 @@ namespace PepperDash.Essentials.Plugins
 
 			trilist.SetStringSigAction(joinMap.DataSend.JoinNumber, text =>
 			{
-				this.LogInformation("LinkToApi: '{text}' ==> SendTextTextToAllClients", text);
+				this.LogVerbose("LinkToApi: '{text}' ==> SendTextToAllClients", text);
 				SendTextToAllClients(text);
 			});
 
@@ -181,7 +181,6 @@ namespace PepperDash.Essentials.Plugins
 				return;
 			}
 
-			this.LogWarning("SendTextToBridge: '{text}'", text);
 			eisc.Eisc.SetString(joinMap.DataReceived.JoinNumber, text);
 		}
 
@@ -205,7 +204,6 @@ namespace PepperDash.Essentials.Plugins
 
 			var byteString = Encoding.ASCII.GetString(bytes, 0, bytes.Length);
 
-			this.LogWarning("SendBytesToBridge: '{bytesString}'", byteString);
 			eisc.Eisc.SetString(joinMap.DataReceived.JoinNumber, byteString);
 		}
 
