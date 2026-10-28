@@ -61,6 +61,14 @@ namespace PepperDash.Essentials.Plugins
 			_internalPort = config.Port > 5000 ? config.Port : 5001;
 			_externalPort = _internalPort;
 
+			// keep track of connected clients
+			_clients = new List<TcpClient>();
+
+			// Initialize feedback instances once (not on every property access)
+			// Created before the listener so the bridge can still link if listener setup fails
+			IsListeningFeedback = new BoolFeedback("IsListeningFeedback", () => IsListening);
+			ClientsConnectedFeedback = new IntFeedback("ClientsConnectedFeedback", () => { lock (_clientsLock) { return _clients.Count; } });
+
 			try
 			{
 				_endPoint = new IPEndPoint(
@@ -69,13 +77,6 @@ namespace PepperDash.Essentials.Plugins
 					: System.Net.IPAddress.Parse(_config.AddressToAcceptConnectionsFrom), _internalPort);
 
 				_server = new TcpListener(_endPoint);
-
-				// keep track of connected clients
-				_clients = new List<TcpClient>();
-
-				// Initialize feedback instances once (not on every property access)
-				IsListeningFeedback = new BoolFeedback("IsListeningFeedback", () => IsListening);
-				ClientsConnectedFeedback = new IntFeedback("ClientsConnectedFeedback", () => { lock (_clientsLock) { return _clients.Count; } });
 			}
 			catch (Exception ex)
 			{
@@ -274,6 +275,12 @@ namespace PepperDash.Essentials.Plugins
 			if (IsListening)
 			{
 				this.LogInformation("StartServer: TCP Server {status}", IsListening ? "is listening" : "is stopped");
+				return;
+			}
+
+			if (_server == null)
+			{
+				this.LogError("StartServer: TCP listener was not created, check the device configuration");
 				return;
 			}
 
