@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -19,12 +20,22 @@ namespace PepperDash.Essentials.Plugins
 {
 	public class GenericTcpServer : EssentialsBridgeableDevice, IDisposable
 	{
-		private readonly GenericTcpServerConfig _config;
+		private readonly GenericTcpServerPropertiesConfig _config;
 		private readonly IPEndPoint _endPoint;
 		private readonly TcpListener _server;
 		private readonly List<TcpClient> _clients;
 		private readonly object _clientsLock = new object();
+		private readonly object _stateLock = new object();
 		private Thread _listenerThread;
+		private int _disposed;
+
+		// Pending connection queue; the client limit is enforced separately by MaxNumberOfClients
+		private const int ListenBacklog = 10;
+
+		// TCP keepalive so clients that drop without closing (power loss, cable pull) are detected in ~45s
+		private const int KeepAliveTimeSeconds = 30;
+		private const int KeepAliveIntervalSeconds = 5;
+		private const int KeepAliveRetryCount = 3;
 
 		private int _internalPort;
 		private int _externalPort;
@@ -33,7 +44,7 @@ namespace PepperDash.Essentials.Plugins
 		private EiscApiAdvanced eisc;
 		private GenericTcpServerBridgeJoinMap joinMap;
 
-		private bool _isListening;
+		private volatile bool _isListening;
 		public bool IsListening
 		{
 			get { return _isListening; }
@@ -54,12 +65,20 @@ namespace PepperDash.Essentials.Plugins
 		/// <param name="key"></param>
 		/// <param name="name"></param>
 		/// <param name="config"></param>
-		public GenericTcpServer(string key, string name, GenericTcpServerConfig config)
+		public GenericTcpServer(string key, string name, GenericTcpServerPropertiesConfig config)
 			: base(key, name)
 		{
 			_config = config;
 			_internalPort = config.Port > 5000 ? config.Port : 5001;
 			_externalPort = _internalPort;
+
+			// keep track of connected clients
+			_clients = new List<TcpClient>();
+
+			// Initialize feedback instances once (not on every property access)
+			// Created before the listener so the bridge can still link if listener setup fails
+			IsListeningFeedback = new BoolFeedback("IsListeningFeedback", () => IsListening);
+			ClientsConnectedFeedback = new IntFeedback("ClientsConnectedFeedback", () => { lock (_clientsLock) { return _clients.Count; } });
 
 			try
 			{
@@ -69,13 +88,6 @@ namespace PepperDash.Essentials.Plugins
 					: System.Net.IPAddress.Parse(_config.AddressToAcceptConnectionsFrom), _internalPort);
 
 				_server = new TcpListener(_endPoint);
-
-				// keep track of connected clients
-				_clients = new List<TcpClient>();
-
-				// Initialize feedback instances once (not on every property access)
-				IsListeningFeedback = new BoolFeedback("IsListeningFeedback", () => IsListening);
-				ClientsConnectedFeedback = new IntFeedback("ClientsConnectedFeedback", () => { lock (_clientsLock) { return _clients.Count; } });
 			}
 			catch (Exception ex)
 			{
@@ -89,17 +101,12 @@ namespace PepperDash.Essentials.Plugins
 		/// <summary>
 		/// Device Initialize
 		/// </summary>
-		public override void Initialize()
+		protected override void Initialize()
 		{
-			if (_server != null)
+			StartServer();
+
+			if (IsListening)
 			{
-				_server.Start(_config.MaxNumberOfClients);
-				IsListening = true;
-
-				// Start the listener thread AFTER the server has started
-				_listenerThread = new Thread(new ThreadStart(HandleClientConnections));
-				_listenerThread.Start();
-
 				AddPortForward();
 			}
 			base.Initialize();
@@ -146,11 +153,7 @@ namespace PepperDash.Essentials.Plugins
 
 			trilist.SetSigTrueAction(joinMap.DisconnectAllClients.JoinNumber, DisconnectAllClients);
 
-			trilist.SetStringSigAction(joinMap.DataSend.JoinNumber, text =>
-			{
-				this.LogInformation("LinkToApi: '{text}' ==> SendTextTextToAllClients", text);
-				SendTextToAllClients(text);
-			});
+			trilist.SetStringSigAction(joinMap.DataSend.JoinNumber, SendTextToAllClients);
 
 			trilist.OnlineStatusChange += (o, a) =>
 			{
@@ -181,7 +184,6 @@ namespace PepperDash.Essentials.Plugins
 				return;
 			}
 
-			this.LogWarning("SendTextToBridge: '{text}'", text);
 			eisc.Eisc.SetString(joinMap.DataReceived.JoinNumber, text);
 		}
 
@@ -205,7 +207,6 @@ namespace PepperDash.Essentials.Plugins
 
 			var byteString = Encoding.ASCII.GetString(bytes, 0, bytes.Length);
 
-			this.LogWarning("SendBytesToBridge: '{bytesString}'", byteString);
 			eisc.Eisc.SetString(joinMap.DataReceived.JoinNumber, byteString);
 		}
 
@@ -216,27 +217,7 @@ namespace PepperDash.Essentials.Plugins
 		public void SendTextToAllClients(string text)
 		{
 			if (string.IsNullOrEmpty(text)) return;
-			var message = Encoding.ASCII.GetBytes(text);
-			TcpClient[] clientsSnapshot;
-			lock (_clientsLock)
-			{
-				clientsSnapshot = _clients.ToArray();
-			}
-			foreach (var client in clientsSnapshot)
-			{
-				if (client.Connected)
-				{
-					try
-					{
-						var stream = client.GetStream();
-						stream.Write(message, 0, message.Length);
-					}
-					catch (Exception ex)
-					{
-						this.LogError(ex, "SendTextToAllClients Exception");
-					}
-				}
-			}
+			SendBytesToAllClients(Encoding.ASCII.GetBytes(text));
 		}
 
 		/// <summary>
@@ -253,17 +234,15 @@ namespace PepperDash.Essentials.Plugins
 			}
 			foreach (var client in clientsSnapshot)
 			{
-				if (client.Connected)
+				try
 				{
-					try
-					{
-						var stream = client.GetStream();
-						stream.Write(bytes, 0, bytes.Length);
-					}
-					catch (Exception ex)
-					{
-						this.LogError(ex, "SendBytesToAllClients Exception");
-					}
+					client.GetStream().Write(bytes, 0, bytes.Length);
+				}
+				catch (Exception ex)
+				{
+					// Closing the client ends its session thread, which removes it from the list
+					this.LogWarning("SendBytesToAllClients: Write failed, closing client: {message}", ex.Message);
+					client.Close();
 				}
 			}
 		}
@@ -273,24 +252,38 @@ namespace PepperDash.Essentials.Plugins
 		/// </summary>
 		public void StartServer()
 		{
-			if (IsListening)
+			// Serializes start/stop between Initialize and the bridge IsListening join
+			lock (_stateLock)
 			{
-				this.LogInformation("StartServer: TCP Server {status}", IsListening ? "is listening" : "is stopped");
-				return;
-			}
+				if (IsListening)
+				{
+					this.LogInformation("StartServer: TCP Server is listening");
+					return;
+				}
 
-			_server.Start(_config.MaxNumberOfClients);
+				if (_server == null)
+				{
+					this.LogError("StartServer: TCP listener was not created, check the device configuration");
+					return;
+				}
 
-			// IsListening = true;
-			IsListening = _server.Server.IsBound;
+				try
+				{
+					_server.Start(ListenBacklog);
+				}
+				catch (System.Net.Sockets.SocketException ex)
+				{
+					this.LogError(ex, "StartServer: Unable to listen on {endPointAddress}:{endPointPort}", _endPoint.Address, _endPoint.Port);
+					return;
+				}
 
-			if (_listenerThread == null || !_listenerThread.IsAlive)
-			{
-				_listenerThread = new Thread(new ThreadStart(HandleClientConnections));
+				IsListening = true;
+
+				_listenerThread = new Thread(new ThreadStart(HandleClientConnections)) { IsBackground = true };
 				_listenerThread.Start();
-			}
 
-			this.LogInformation("StartServer: TCP Server {status}", IsListening ? "has been started" : "is stopped");
+				this.LogInformation("StartServer: TCP Server has been started");
+			}
 		}
 
 		/// <summary>
@@ -298,22 +291,27 @@ namespace PepperDash.Essentials.Plugins
 		/// </summary>
 		public void StopServer()
 		{
-			if (!IsListening)
+			lock (_stateLock)
 			{
-				this.LogInformation("StopServer: TCP Server {status}", IsListening ? "is listening" : "is stopped");
-				return;
+				if (!IsListening)
+				{
+					this.LogInformation("StopServer: TCP Server is stopped");
+					return;
+				}
+
+				IsListening = false;
+				_server.Stop();
+
+				// Wait for the listener loop to exit so a quick restart can't race the old thread
+				_listenerThread?.Join(1000);
+
+				DisconnectAllClients();
+
+				// commented out to prevent port forward removal on stop
+				//RemovePortForward();
+
+				this.LogInformation("StopServer: TCP Server has been stopped");
 			}
-
-			DisconnectAllClients();
-
-			_server.Stop();
-			// IsListening = false;
-			IsListening = _server.Server.IsBound;
-
-			// commented out to prevent port forward removal on stop
-			//RemovePortForward();
-
-			this.LogInformation("StopServer: TCP Server {status}", IsListening ? "is listening" : "has been stopped");
 		}
 
 		/// <summary>
@@ -329,16 +327,13 @@ namespace PepperDash.Essentials.Plugins
 			}
 			foreach (var client in clientsSnapshot)
 			{
-				if (client.Connected)
+				try
 				{
-					try
-					{
-						client.Close();
-					}
-					catch (Exception ex)
-					{
-						this.LogError(ex, "DisconnectAllClients Exception");
-					}
+					client.Close();
+				}
+				catch (Exception ex)
+				{
+					this.LogError(ex, "DisconnectAllClients Exception");
 				}
 			}
 
@@ -424,15 +419,32 @@ namespace PepperDash.Essentials.Plugins
 					if (_server.Pending())
 					{
 						var client = _server.AcceptTcpClient();
+						var remoteEndPoint = client.Client.RemoteEndPoint;
+
+						bool accepted;
 						lock (_clientsLock)
 						{
-							_clients.Add(client);
+							accepted = _config.MaxNumberOfClients <= 0 || _clients.Count < _config.MaxNumberOfClients;
+							if (accepted)
+							{
+								_clients.Add(client);
+							}
 						}
-						this.LogInformation("HandleClientConnections: Client connected from {remoteEndPoint}", client.Client.RemoteEndPoint);
+
+						if (!accepted)
+						{
+							this.LogWarning("HandleClientConnections: Rejected client from {remoteEndPoint}, maximum of {maxNumberOfClients} clients reached", remoteEndPoint, _config.MaxNumberOfClients);
+							client.Close();
+							continue;
+						}
+
+						EnableKeepAlive(client);
+
+						this.LogInformation("HandleClientConnections: Client connected from {remoteEndPoint}", remoteEndPoint);
 
 						ClientsConnectedFeedback.FireUpdate();
 
-						var t = new Thread(new ParameterizedThreadStart(HandleClientSession));
+						var t = new Thread(new ParameterizedThreadStart(HandleClientSession)) { IsBackground = true };
 						t.Start(client);
 					}
 					else
@@ -440,18 +452,10 @@ namespace PepperDash.Essentials.Plugins
 						Thread.Sleep(100); // Avoid busy waiting
 					}
 				}
-				catch (System.Net.Sockets.SocketException ex)
+				catch (Exception) when (!IsListening)
 				{
-					// SocketException is expected during shutdown when _server.Stop() interrupts pending operations
-					if (IsListening)
-					{
-						this.LogError(ex, "HandleClientConnections SocketException");
-					}
-					else
-					{
-						this.LogDebug("HandleClientConnections: Socket interrupted during shutdown");
-						break;
-					}
+					// Expected during shutdown when _server.Stop() interrupts Pending/AcceptTcpClient
+					break;
 				}
 				catch (Exception ex)
 				{
@@ -465,49 +469,30 @@ namespace PepperDash.Essentials.Plugins
 		void HandleClientSession(object obj)
 		{
 			var client = (TcpClient)obj;
+			var remoteEndPoint = client.Client.RemoteEndPoint;
 			try
 			{
 				using (var stream = client.GetStream())
 				{
 					var buffer = new byte[1024];
+					int length;
 
-					while (IsListening && client.Connected)
+					// Read blocks until data arrives and returns 0 when the client closes the connection
+					while (IsListening && (length = stream.Read(buffer, 0, buffer.Length)) > 0)
 					{
-						try
-						{
-							if (stream.DataAvailable)
-							{
-								var length = stream.Read(buffer, 0, buffer.Length);
+						var message = Encoding.ASCII.GetString(buffer, 0, length).Trim();
 
-								if (length > 0)
-								{
-									var message = Encoding.ASCII.GetString(buffer, 0, length).Trim();
-									this.LogVerbose("HandleClientSession: Received message from {remoteEndPoint}: {message}", client.Client.RemoteEndPoint, message);
+						SendTextToBridge(message);
 
-									SendTextToBridge(message);
-
-									// Echo the message back to the client
-									//var response = Encoding.ASCII.GetBytes($"Echo: {message}");
-									//stream.Write(response, 0, response.Length);
-								}
-							}
-							else
-							{
-								Thread.Sleep(10); // Small sleep when no data available
-							}
-						}
-						catch (ObjectDisposedException)
-						{
-							// Stream was disposed during shutdown, exit gracefully
-							break;
-						}
+						// Echo the message back to the client
+						//var response = Encoding.ASCII.GetBytes($"Echo: {message}");
+						//stream.Write(response, 0, response.Length);
 					}
 				}
 			}
-			catch (ObjectDisposedException)
+			catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException)
 			{
-				// Expected during shutdown, no need to log as error
-				this.LogDebug("HandleClientSession: Stream disposed during shutdown");
+				// Connection reset by the client, keepalive timeout, or closed locally (stop/disconnect/failed write)
 			}
 			catch (Exception ex)
 			{
@@ -520,13 +505,33 @@ namespace PepperDash.Essentials.Plugins
 				{
 					_clients.Remove(client);
 				}
+				client.Close();
 				ClientsConnectedFeedback.FireUpdate();
-				this.LogDebug("HandleClientSession: Client disconnected");
+				this.LogInformation("HandleClientSession: Client disconnected from {remoteEndPoint}", remoteEndPoint);
+			}
+		}
+
+		void EnableKeepAlive(TcpClient client)
+		{
+			try
+			{
+				client.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+				client.Client.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, KeepAliveTimeSeconds);
+				client.Client.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, KeepAliveIntervalSeconds);
+				client.Client.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveRetryCount, KeepAliveRetryCount);
+			}
+			catch (Exception ex)
+			{
+				this.LogWarning("EnableKeepAlive: Unable to enable TCP keepalive, dropped clients may not be detected: {message}", ex.Message);
 			}
 		}
 
 		public void Dispose()
 		{
+			if (System.Threading.Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+			CrestronEnvironment.ProgramStatusEventHandler -= HandleProgramEvent;
+
 			if (_server != null)
 			{
 				StopServer();
