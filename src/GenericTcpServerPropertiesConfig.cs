@@ -18,8 +18,11 @@ namespace PepperDash.Essentials.Plugins
 		[JsonProperty("port", DefaultValueHandling = DefaultValueHandling.Ignore)]
 		public int Port { get; set; }
 
+		/// <summary>
+		/// Maximum number of simultaneously connected clients; 0 or omitted means no limit
+		/// </summary>
 		[JsonProperty("maxNumberOfClients", DefaultValueHandling = DefaultValueHandling.Ignore)]
-		public int MaxNumberOfClients { get; set; } = 5;
+		public int MaxNumberOfClients { get; set; }
 
 		/// <summary>
 		/// Constuctor

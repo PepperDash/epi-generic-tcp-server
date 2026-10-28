@@ -28,8 +28,9 @@ This plugin provides a generic TCP server that listens for client connections an
   - Must be between 1 and 65535
   - Common choices: 5001, 9000, etc.
 
-- **maxNumberOfClients** (integer, optional): Max number of clients to listen for
-  - If omitted, will default to 5
+- **maxNumberOfClients** (integer, optional): Maximum number of simultaneously connected clients
+  - Additional clients are disconnected immediately after connecting
+  - If omitted or 0, there is no limit
 
 ### Bridge Configuration
 
