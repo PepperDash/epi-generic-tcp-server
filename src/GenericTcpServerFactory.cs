@@ -15,10 +15,9 @@ namespace PepperDash.Essentials.Plugins
 		public GenericTcpServerFactory()
 		{
 			// Set the minimum Essentials Framework Version
-			MinimumEssentialsFrameworkVersion = "2.24.4";
+			MinimumEssentialsFrameworkVersion = "3.0.0";
 
 			// In the constructor we initialize the list with the typenames that will build an instance of this device
-			// TODO [ ] Update the TypeNames for the plugin being developed
 			TypeNames = new List<string>() { "tcpServer" };
 		}
 
@@ -32,7 +31,7 @@ namespace PepperDash.Essentials.Plugins
 			Debug.LogVerbose("[{key}] Factory Attempting to create new device from type: {type}", dc.Key, dc.Type);
 
 			// get the plugin device properties configuration object & check for null 
-			var propertiesConfig = dc.Properties.ToObject<GenericTcpServerConfig>();
+			var propertiesConfig = dc.Properties.ToObject<GenericTcpServerPropertiesConfig>();
 			if (propertiesConfig != null) return new GenericTcpServer(dc.Key, dc.Name, propertiesConfig);
 
 			Debug.LogError("[{key}] Factory: failed to read properties config for {name}", dc.Key, dc.Name);

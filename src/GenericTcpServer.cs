@@ -19,7 +19,7 @@ namespace PepperDash.Essentials.Plugins
 {
 	public class GenericTcpServer : EssentialsBridgeableDevice, IDisposable
 	{
-		private readonly GenericTcpServerConfig _config;
+		private readonly GenericTcpServerPropertiesConfig _config;
 		private readonly IPEndPoint _endPoint;
 		private readonly TcpListener _server;
 		private readonly List<TcpClient> _clients;
@@ -54,7 +54,7 @@ namespace PepperDash.Essentials.Plugins
 		/// <param name="key"></param>
 		/// <param name="name"></param>
 		/// <param name="config"></param>
-		public GenericTcpServer(string key, string name, GenericTcpServerConfig config)
+		public GenericTcpServer(string key, string name, GenericTcpServerPropertiesConfig config)
 			: base(key, name)
 		{
 			_config = config;
@@ -89,7 +89,7 @@ namespace PepperDash.Essentials.Plugins
 		/// <summary>
 		/// Device Initialize
 		/// </summary>
-		public override void Initialize()
+		protected override void Initialize()
 		{
 			if (_server != null)
 			{
@@ -97,7 +97,7 @@ namespace PepperDash.Essentials.Plugins
 				IsListening = true;
 
 				// Start the listener thread AFTER the server has started
-				_listenerThread = new Thread(new ThreadStart(HandleClientConnections));
+				_listenerThread = new Thread(new ThreadStart(HandleClientConnections)) { IsBackground = true };
 				_listenerThread.Start();
 
 				AddPortForward();
@@ -286,7 +286,7 @@ namespace PepperDash.Essentials.Plugins
 
 			if (_listenerThread == null || !_listenerThread.IsAlive)
 			{
-				_listenerThread = new Thread(new ThreadStart(HandleClientConnections));
+				_listenerThread = new Thread(new ThreadStart(HandleClientConnections)) { IsBackground = true };
 				_listenerThread.Start();
 			}
 
@@ -432,7 +432,7 @@ namespace PepperDash.Essentials.Plugins
 
 						ClientsConnectedFeedback.FireUpdate();
 
-						var t = new Thread(new ParameterizedThreadStart(HandleClientSession));
+						var t = new Thread(new ParameterizedThreadStart(HandleClientSession)) { IsBackground = true };
 						t.Start(client);
 					}
 					else

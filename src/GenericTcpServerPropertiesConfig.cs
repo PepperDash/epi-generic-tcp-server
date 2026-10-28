@@ -6,7 +6,7 @@ namespace PepperDash.Essentials.Plugins
 	/// <summary>
 	/// Plugin device configuration object
 	/// </summary>
-	public class GenericTcpServerConfig
+	public class GenericTcpServerPropertiesConfig
 	{
 		[JsonProperty("control")]
         public EssentialsControlPropertiesConfig Control { get; set; }
@@ -24,7 +24,7 @@ namespace PepperDash.Essentials.Plugins
 		/// <summary>
 		/// Constuctor
 		/// </summary>
-		public GenericTcpServerConfig()
+		public GenericTcpServerPropertiesConfig()
 		{
 
 		}
